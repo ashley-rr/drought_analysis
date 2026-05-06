@@ -77,7 +77,7 @@ except ImportError:
 # --------------------- Page config ---------------------
 st.set_page_config(
     page_title="U.S. Drought Monitor",
-    page_icon="ðŸŒµ",
+    page_icon="🌞",
     layout="wide",
     initial_sidebar_state="expanded",
 )

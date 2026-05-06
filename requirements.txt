@@ -2,3 +2,7 @@ pandas
 numpy
 plotly
 feature-engine
+matplotlib
+seaborn
+scikit-learn
+imbalanced-learn
