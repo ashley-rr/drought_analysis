@@ -5,8 +5,6 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 
-# http://localhost:8501/
-
 from drought_utils import (
     load_complete_dataset,
     get_class_distribution,
