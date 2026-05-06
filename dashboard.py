@@ -10,7 +10,7 @@ from drought_utils import (
     generate_demo_data,
     get_class_distribution,
     get_correlation_matrix,
-    DROUGHT_LABELS,
+    SCALED_DROUGHT_LABELS,
     DROUGHT_COLORS
 )
 
@@ -193,23 +193,40 @@ PLOTLY_LAYOUT = dict(
     font=dict(family='Syne', color='#e8dcc8'),
     xaxis=dict(gridcolor='#2a2216', linecolor='#3a3020'),
     yaxis=dict(gridcolor='#2a2216', linecolor='#3a3020'),
-    margin=dict(l=40, r=20, t=50, b=40),
 )
 
-# â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+# --------------------- Sidebar ---------------------
 with st.sidebar:
-    st.markdown("### ðŸŒµ Controls")
-    
+    st.markdown("### Controls")
+#     import streamlit as st
+
+# # Custom CSS to change the appearance of headers and the main container
+# st.markdown("""
+#     <style>
+#     .main {
+#         background-color: #f0f2f6;
+#     }
+#     h1 {
+#         color: #ff4b4b;
+#         text-align: center;
+#     }
+#     </style>
+#     """, unsafe_allow_html=True)
+
+# st.title("Styled Streamlit App")
+
     df_active = test_df
 
     st.markdown("---")
 
-    all_scores = sorted(df_active['score'].unique())
+    all_scores = sorted(df_active['score'].unique())[:4]
+    
     score_filter = st.multiselect(
         "Drought Levels",
         options=all_scores,
         default=all_scores,
-        format_func=lambda x: DROUGHT_LABELS.get(x, str(x))
+        format_func=lambda x: SCALED_DROUGHT_LABELS.get(x, str(x))
     )
 
     st.markdown("---")
@@ -227,9 +244,9 @@ with st.sidebar:
         region_compare = []
 
 
-# â”€â”€ Filter data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Use the sidebar selections as global filters. The state table and relative map
-# are both based on this filtered dataframe.
+# --------------------- Sidebar Filter ---------------------
+
+# Make copy of dataset for filter
 df = df_active.copy()
 
 if year_range and 'year' in df.columns:
@@ -238,14 +255,11 @@ if year_range and 'year' in df.columns:
         (df['year'] <= year_range[1])
     ]
 
-if score_filter and 'score' in df.columns:
-    df = df[df['score'].isin(score_filter)]
-
-# â”€â”€ State-level aggregation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# --------------------- State-level aggregation ---------------------
 state_scores = pd.DataFrame()
 
 if 'fips' in df.columns:
-    # Convert county FIPS â†’ state FIPS using the first 2 digits.
+    # Convert county FIPS to state FIPS using the first 2 digits.
     df['state_fips'] = df['fips'].astype(str).str.zfill(5).str[:2]
 
     state_scores = df.groupby('state_fips').agg(
@@ -269,25 +283,21 @@ if 'fips' in df.columns:
         'state_fips', 'state_name', 'avg_score', 'scaled_score', 'count'
     ]].sort_values('avg_score', ascending=False)
 
-# â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# --------------------- Hero ---------------------
 st.markdown("""
 <div class="hero">
   <p class="hero-title">U.S. DROUGHT MONITOR</p>
   <p class="hero-sub">// METEOROLOGICAL & SOIL ANALYSIS DASHBOARD</p>
 </div>
 """, unsafe_allow_html=True)
- 
-if is_demo:
-    st.info("âš ï¸ **Demo Mode** â€” Place `test.csv` and `soil_data.csv` in the same directory to use real data.")
 
-
-# â”€â”€ KPI row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# --------------------- KPI row ---------------------
 c1, c2, c3, c4 = st.columns(4)
 metrics = [
     ("RECORDS", f"{len(df):,}"),
-    ("AVG TEMP (Â°C)", f"{df['t2m'].mean():.1f}" if 't2m' in df else "â€”"),
-    ("AVG PRECIP (mm)", f"{df['prectot'].mean():.2f}" if 'prectot' in df else "â€”"),
-    ("DROUGHT â‰¥ D2 (%)", f"{(df['score'] >= 2).mean()*100:.1f}%"),
+    ("AVG TEMP (F°)", f"{(df['t2m'] * 1.8 + 30).mean():.1f}" if 't2m' in df else "---"),
+    ("AVG PRECIP (mm)", f"{df['prectot'].mean():.2f}" if 'prectot' in df else "---"),
+    ("DROUGHT ≥ D2 (%)", f"{(df['score'] >= 2).mean()*100:.1f}%"),
 ]
 for col, (lbl, val) in zip([c1, c2, c3, c4], metrics):
     col.markdown(f"""
@@ -298,39 +308,44 @@ for col, (lbl, val) in zip([c1, c2, c3, c4], metrics):
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# â”€â”€ Tab layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["ðŸ—ºï¸ Map", "ðŸ“ˆ Time Series", "ðŸ”¬ Feature Analysis", "ðŸ“Š Distributions", "ðŸ“‹ State Scores"])
+# --------------------- Tab layout ---------------------
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🗺️ Map", "⌛ Time Series", "💡 Feature Analysis", "📈 Distributions", "📄 State Scores"])
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 1 â€“ MAP
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# --------------------- Map Tab ---------------------
 with tab1:
     st.markdown('<p class="section-header">Geographic Drought Distribution</p>', unsafe_allow_html=True)
 
     map_col, info_col = st.columns([3, 1])
-
+    
     with map_col:
         if not state_scores.empty:
             agg = state_scores.copy()
+
             agg['drought_label'] = (
-                agg['avg_score']
+                agg['scaled_score']
                 .round()
-                .clip(lower=0, upper=5)
+                .clip(lower=0, upper=3)
                 .astype(int)
-                .map(DROUGHT_LABELS)
+                .map(SCALED_DROUGHT_LABELS)
             )
 
+            filtered_agg = agg
+
+            # Filter for drought labels selected by user (unless filter is empty) 
+            if (len(score_filter) > 0):
+                selected_labels = [SCALED_DROUGHT_LABELS[s] for s in score_filter]
+                filtered_agg = agg[agg['drought_label'].isin(selected_labels)]
+
             fig_map = px.choropleth_mapbox(
-                agg,
+                filtered_agg,
                 geojson=states_geojson,
                 locations='state_name',
                 color='scaled_score',
                 color_continuous_scale=list(DROUGHT_COLORS.values()),
                 range_color=[0, 3],
                 mapbox_style="carto-darkmatter",
-                zoom=3.2,
-                center={"lat": 37.5, "lon": -96},
-                opacity=0.8,
+                zoom=1.5,
+                center={"lat": 54.34, "lon": -115.399},
                 hover_name='state_name',
                 hover_data={
                     'avg_score': ':.3f',
@@ -339,8 +354,9 @@ with tab1:
                     'state_fips': False,
                 },
                 labels={
-                    'avg_score': 'Actual Avg Score',
-                    'scaled_score': 'Relative Score (0-3)',
+                    'state_name': 'State',
+                    'avg_score': 'Actual Average Score',
+                    'scaled_score': 'Relative Score',
                     'count': 'Records',
                 },
                 featureidkey="properties.name"
@@ -361,7 +377,7 @@ with tab1:
         else:
             st.warning("FIPS column required for choropleth map.")
  
-    # Legend/Map Key
+    # Highest and lowest state scores
     with info_col:
         st.markdown("**Relative Map Scale**")
         if not state_scores.empty:
@@ -379,14 +395,22 @@ with tab1:
                 unsafe_allow_html=True,
             )
 
+        # Map legend
         st.markdown("---")
         st.markdown("**Record Drought Levels**")
         class_dist = get_class_distribution(df['score'])
-        for lvl, label in DROUGHT_LABELS.items():
+
+        # Count unique states
+        state_counts = agg['drought_label'].value_counts().sort_index()
+
+        # Convert to percentages
+        state_percentages = (state_counts / state_counts.sum()) * 100
+
+        for lvl, label in SCALED_DROUGHT_LABELS.items():
             if lvl in class_dist['counts']:
                 color = DROUGHT_COLORS[lvl]
-                count = class_dist['counts'][lvl]
-                pct = class_dist['percentages'][lvl]
+                count = state_counts[label]
+                pct = state_percentages[label]
                 st.markdown(f"""
                 <div style="display:flex;align-items:center;gap:8px;margin:6px 0;font-size:.85rem;">
                   <div style="width:12px;height:12px;border-radius:2px;background:{color};flex-shrink:0;"></div>
@@ -409,36 +433,57 @@ with tab1:
             st.plotly_chart(fig_reg, use_container_width=True)
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 2 â€“ TIME SERIES
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# --------------------- Time Series Tab ---------------------
 with tab2:
     st.markdown('<p class="section-header">Temporal Patterns</p>', unsafe_allow_html=True)
  
     if 'date' in df.columns:
-        ts = df.groupby('date').agg(
-            score=('score', 'mean'),
-            t2m=('t2m', 'mean') if 't2m' in df else ('score', 'count'),
-            prectot=('prectot', 'mean') if 'prectot' in df else ('score', 'count')
+        
+        # Get year from date
+        df['year'] = df['date'].dt.year
+        df['t2m'] = df['t2m'] * 1.8 + 32
+
+        # State-year average
+        state_year = df.groupby(['year', 'state_fips']).agg(
+            state_score=('score', 'mean'),
+            t2m=('t2m', 'mean'),
+            prectot=('prectot', 'mean')
         ).reset_index()
+
+        # Average across states per year
+        ts = df.groupby('year')[['score', 't2m', 'prectot']].mean().reset_index()
+
+        fig_ts = make_subplots(rows=3, cols=1, x_title="Year",
+            subplot_titles=("Average Drought Score", "Average Temperature (F°)", "Average Precipitation (mm)"),
+            vertical_spacing=0.15,
+            )
  
-        fig_ts = make_subplots(rows=3, cols=1, shared_xaxes=True,
-                               subplot_titles=("Avg Drought Score", "Avg Temperature (Â°C)", "Avg Precipitation (mm)"),
-                               vertical_spacing=0.08)
+        fig_ts.add_trace(go.Scatter(
+            x=ts['year'],
+            y=ts['score'],
+            mode='lines+markers',
+            line=dict(color='#c8873a', width=2),
+            name='Drought Score',
+            fill='tozeroy',
+            fillcolor='rgba(200,135,58,0.15)'
+        ), row=1, col=1)
+
+        fig_ts.update_annotations(font_size=25)
+
+        fig_ts.update_yaxes(
+            tickvals=[0, 1, 2, 3],
+            ticktext=["None","Abnormal","Moderate","Severe"],
+            row=1, col=1
+        )
+
+        fig_ts.add_trace(go.Scatter(x=ts['year'], y=ts['t2m'], mode='lines',
+            line=dict(color='#e87030', width=1.5), name='Temp'), row=2, col=1)
+    
+        fig_ts.add_trace(go.Bar(x=ts['year'], y=ts['prectot'],
+            marker_color='#4a9e6b', name='Precip'), row=3, col=1)
  
-        fig_ts.add_trace(go.Scatter(x=ts['date'], y=ts['score'], mode='lines',
-                                    line=dict(color='#c8873a', width=2), name='Drought Score',
-                                    fill='tozeroy', fillcolor='rgba(200,135,58,0.15)'), row=1, col=1)
+        fig_ts.update_layout(**PLOTLY_LAYOUT, height=1500, showlegend=False, margin=dict(l=220, r=120), yaxis_range=[0,3.3])
         
-        if 't2m' in df.columns:
-            fig_ts.add_trace(go.Scatter(x=ts['date'], y=ts['t2m'], mode='lines',
-                                        line=dict(color='#e87030', width=1.5), name='Temp'), row=2, col=1)
-        
-        if 'prectot' in df.columns:
-            fig_ts.add_trace(go.Bar(x=ts['date'], y=ts['prectot'],
-                                    marker_color='#4a9e6b', opacity=0.7, name='Precip'), row=3, col=1)
- 
-        fig_ts.update_layout(**PLOTLY_LAYOUT, height=520, showlegend=False)
         for i in range(1, 4):
             fig_ts.update_xaxes(gridcolor='#2a2216', linecolor='#3a3020', row=i, col=1)
             fig_ts.update_yaxes(gridcolor='#2a2216', linecolor='#3a3020', row=i, col=1)
@@ -453,17 +498,16 @@ with tab2:
                 x=[pd.Timestamp(2000, m, 1).strftime('%b') for m in pivot.columns],
                 y=pivot.index.astype(str),
                 colorscale=list(DROUGHT_COLORS.values()),
-                zmin=0, zmax=5,
+                zmin=1, zmax=2.5,
                 hoverongaps=False,
                 colorbar=dict(title='Score')
             ))
-            fig_heat.update_layout(**PLOTLY_LAYOUT, height=300, title="Mean Drought Score by Year Ã— Month")
+            fig_heat.update_layout(**PLOTLY_LAYOUT, height=600, margin=dict(l=100, r=100), title="Mean Drought Score by Year & Month")
+            fig_ts.update_annotations(font_size=60)
             st.plotly_chart(fig_heat, use_container_width=True)
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 3 â€“ FEATURE ANALYSIS
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# --------------------- Feature Analysis Tab ---------------------
 with tab3:
     st.markdown('<p class="section-header">Feature Relationships</p>', unsafe_allow_html=True)
  
@@ -520,9 +564,7 @@ with tab3:
         st.plotly_chart(fig_box, use_container_width=True)
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 4 â€“ DISTRIBUTIONS
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# --------------------- Distributions Tab ---------------------
 with tab4:
     st.markdown('<p class="section-header">Score Distributions</p>', unsafe_allow_html=True)
  
@@ -531,7 +573,7 @@ with tab4:
     with d_col1:
         counts = df['score'].value_counts().sort_index()
         fig_bar = go.Figure(go.Bar(
-            x=[DROUGHT_LABELS.get(i, str(i)) for i in counts.index],
+            x=[SCALED_DROUGHT_LABELS.get(i, str(i)) for i in counts.index],
             y=counts.values,
             marker_color=[DROUGHT_COLORS.get(i, '#888') for i in counts.index],
             text=counts.values, textposition='outside',
@@ -542,7 +584,7 @@ with tab4:
  
     with d_col2:
         fig_pie = go.Figure(go.Pie(
-            labels=[DROUGHT_LABELS.get(i, str(i)) for i in counts.index],
+            labels=[SCALED_DROUGHT_LABELS.get(i, str(i)) for i in counts.index],
             values=counts.values,
             marker_colors=[DROUGHT_COLORS.get(i, '#888') for i in counts.index],
             hole=0.45,
@@ -558,9 +600,7 @@ with tab4:
         st.plotly_chart(fig_pie, use_container_width=True)
  
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# TAB 5 â€“ STATE SCORES
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# --------------------- State scores tab ---------------------
 with tab5:
     st.markdown('<p class="section-header">Actual Average Drought Scores by State</p>', unsafe_allow_html=True)
     st.caption(
@@ -573,9 +613,9 @@ with tab5:
             'state_name', 'avg_score', 'scaled_score', 'count'
         ]].rename(columns={
             'state_name': 'State',
-            'avg_score': 'Actual Avg Score',
+            'avg_score': 'Actual Average Score',
             'scaled_score': 'Relative Score (0-3)',
-            'count': 'Records',
+            'count': 'Number of Records',
         })
 
         st.dataframe(
@@ -583,7 +623,7 @@ with tab5:
             use_container_width=True,
             hide_index=True,
             column_config={
-                'Actual Avg Score': st.column_config.NumberColumn(format='%.4f'),
+                'Actual Average Score': st.column_config.NumberColumn(format='%.4f'),
                 'Relative Score (0-3)': st.column_config.NumberColumn(format='%.4f'),
                 'Records': st.column_config.NumberColumn(format='%d'),
             },
@@ -596,9 +636,9 @@ with tab5:
             orientation='h',
             color='avg_score',
             color_continuous_scale=list(DROUGHT_COLORS.values()),
-            range_color=[0, 5],
+            range_color=[0, 3],
             labels={
-                'avg_score': 'Actual Avg Score',
+                'avg_score': 'Actual Average Score',
                 'state_name': 'State',
             },
             title='Unscaled Average Drought Score by State',
@@ -609,10 +649,10 @@ with tab5:
         st.warning("FIPS column required to calculate state-level averages.")
 
 
-# â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# --------------------- Footer ---------------------
 st.markdown("---")
 st.markdown(
     f"<p style='color:#4a3820;font-family:Space Mono,monospace;font-size:.75rem;text-align:center;'>"
-    f"U.S. DROUGHT MONITOR DASHBOARD Â· Test Set: {len(test_df):,} records</p>",
+    f"U.S. DROUGHT MONITOR DASHBOARD: {len(test_df):,} records</p>",
     unsafe_allow_html=True
 )

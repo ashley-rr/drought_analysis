@@ -14,22 +14,18 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-DROUGHT_LABELS = {
+SCALED_DROUGHT_LABELS = {
     0: "None",
     1: "D0 Abnormal",
     2: "D1 Moderate",
-    3: "D2 Severe",
-    4: "D3 Extreme",
-    5: "D4 Exceptional"
+    3: "D2 Severe"
 }
 
 DROUGHT_COLORS = {
-    0: "#4a9e6b",
-    1: "#b8d44a",
-    2: "#f0c040",
-    3: "#e87030",
-    4: "#c03020",
-    5: "#800010"
+    0: "#4a9e6c",
+    1: "#f0c040",
+    2: "#c03020",
+    3: "#800010"
 }
 
 # ── Data Loading & Preprocessing ───────────────────────────────────────────────
@@ -56,6 +52,7 @@ def load_and_preprocess_data(filepath):
     
     # Round scores to integers
     df['score'] = df['score'].round().astype(int)
+    df['score'] = df['score'].clip(0, 3)
     
     # Standardize column names
     df.columns = df.columns.str.lower().str.replace(" ", "_")
@@ -317,7 +314,7 @@ def generate_demo_data(n_samples=5000):
         't2m': rng.normal(15, 8, n_samples),
         't2mdew': rng.normal(10, 8, n_samples),
         'ws10m': np.abs(rng.normal(4, 1.5, n_samples)),
-        'score': rng.integers(0, 6, n_samples),
+        'score': rng.integers(0, 4, n_samples),
     })
     
     df['date'] = pd.to_datetime(df['date'])
