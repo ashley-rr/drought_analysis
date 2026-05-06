@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from dashboard import fips_to_name 
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -32,12 +33,6 @@ DROUGHT_COLORS = {
 def load_and_preprocess_data(filepath):
     """
     Load CSV and perform initial preprocessing.
-    
-    Args:
-        filepath: Path to the CSV file
-        
-    Returns:
-        DataFrame with initial preprocessing applied
     """
     df = pd.read_csv(filepath)
     
@@ -58,38 +53,6 @@ def load_and_preprocess_data(filepath):
     df.columns = df.columns.str.lower().str.replace(" ", "_")
     
     return df
-
-
-def apply_outlier_treatment(df, measures_list=None):
-    """
-    Apply Winsorizer to handle outliers in numeric features.
-    
-    Args:
-        df: Input DataFrame
-        measures_list: List of columns to treat for outliers (if None, auto-detect)
-        
-    Returns:
-        DataFrame with outliers treated
-    """
-    if measures_list is None:
-        # Auto-detect numeric columns excluding metadata and target
-        measures_list = [x for x in df.select_dtypes(include=["int64", "float64", "int32"]).columns]
-        remove_list = ["fips", "score", "year", "month", "day"]
-        measures_list = [i for i in measures_list if i not in remove_list]
-    
-    outlier = Winsorizer(
-        capping_method="gaussian",
-        tail="both",
-        fold=3,
-        variables=measures_list,
-        missing_values="ignore"
-    )
-    
-    outlier.fit(df)
-    df_treated = outlier.transform(df)
-    
-    return df_treated
-
 
 def prepare_train_test_split(df, test_size=0.2, include_soil=True, soil_df=None):
     """
@@ -124,52 +87,6 @@ def prepare_train_test_split(df, test_size=0.2, include_soil=True, soil_df=None)
     )
     
     return X_train, X_test, y_train, y_test
-
-
-# ── Stratified Sampling ────────────────────────────────────────────────────────
-def stratified_sample(df, total_rows, random_state=42):
-    """
-    Stratified sampling to maintain class distribution.
-    
-    Args:
-        df: Input DataFrame with 'score' column
-        total_rows: Target number of rows
-        random_state: Random seed
-        
-    Returns:
-        Sampled DataFrame
-    """
-    if len(df) <= total_rows:
-        return df
-    
-    score_counts = df['score'].value_counts().sort_index()
-    sampled_dfs = []
-    
-    for score in score_counts.index:
-        score_data = df[df['score'] == score]
-        proportion = len(score_data) / len(df)
-        target_n = int(total_rows * proportion)
-        
-        if len(score_data) >= target_n:
-            sampled = score_data.sample(n=target_n, random_state=random_state)
-        else:
-            sampled = score_data.sample(n=target_n, random_state=random_state, replace=True)
-        
-        sampled_dfs.append(sampled)
-    
-    result = pd.concat(sampled_dfs, ignore_index=True)
-    result = result.sample(frac=1, random_state=random_state).reset_index(drop=True)
-    
-    # Ensure exact size
-    if len(result) > total_rows:
-        result = result.iloc[:total_rows]
-    elif len(result) < total_rows:
-        deficit = total_rows - len(result)
-        extra = df.sample(n=deficit, random_state=random_state)
-        result = pd.concat([result, extra], ignore_index=True)
-    
-    return result
-
 
 # ── Visualization Helpers ──────────────────────────────────────────────────────
 def get_class_distribution(y):
@@ -234,7 +151,6 @@ def get_correlation_matrix(df, exclude_cols=None):
 
 # ── Complete Pipeline ──────────────────────────────────────────────────────────
 def load_complete_dataset(data_path, soil_path=None, 
-                         apply_outlier_treatment_flag=True,
                          sample_size=None):
     """
     Complete data loading pipeline (single dataset).
@@ -242,7 +158,6 @@ def load_complete_dataset(data_path, soil_path=None,
     Args:
         data_path: Path to CSV file (train or test)
         soil_path: Path to soil data CSV (optional)
-        apply_outlier_treatment_flag: Whether to apply outlier treatment
         sample_size: Target size for dataset (None = use all)
         
     Returns:
@@ -250,98 +165,56 @@ def load_complete_dataset(data_path, soil_path=None,
     """
     # Load data
     df = load_and_preprocess_data(data_path)
-    
-    # Apply outlier treatment
-    if apply_outlier_treatment_flag:
-        df = apply_outlier_treatment(df)
-    
-    # Sample if requested
-    if sample_size is not None:
-        df = stratified_sample(df, sample_size)
-    
-    # Load soil data if provided
-    soil_df = None
-    if soil_path is not None:
-        soil_df = pd.read_csv(soil_path)
-    
+ 
     return {
         'df': df,
-        'soil_df': soil_df,
         'class_dist': get_class_distribution(df['score']),
-        'is_demo': False
     }
 
 
-# ── Demo Data Generator ────────────────────────────────────────────────────────
-def generate_demo_data(n_samples=5000):
-    """
-    Generate synthetic demo data when real CSVs aren't available.
-    Uses real FIPS codes with proper US coordinates.
+def sample_data(csv_path="train.csv", n_samples=5000):
     
-    Args:
-        n_samples: Number of samples to generate
-        
-    Returns:
-        Dictionary with df, soil_df, and metadata
-    """
-    import sys
-    import os
-    
-    # Try to import fips_coordinates
-    try:
-        from fips_coordinates import FIPS_COORDS
-        real_fips_list = list(FIPS_COORDS.keys())
-    except ImportError:
-        # Fallback to major US counties if fips_coordinates not available
-        real_fips_list = [
-            "06037", "17031", "48201", "04013", "06073", "36047", "06059",
-            "12086", "36081", "48113", "29095", "06065", "39035", "42101",
-            "26163", "32003", "53033", "25025", "24510", "41051"
-        ]
-    
-    rng = np.random.default_rng(42)
-    
-    # Use real FIPS codes
-    fips = rng.choice(real_fips_list, size=n_samples, replace=True)
-    dates = pd.date_range("2000-01-01", periods=n_samples, freq="D")
-    
-    df = pd.DataFrame({
-        'fips': fips,
-        'date': dates,
-        'prectot': np.abs(rng.normal(3, 2, n_samples)),
-        'ps': rng.normal(101, 0.5, n_samples),
-        'qv2m': np.abs(rng.normal(8, 3, n_samples)),
-        't2m': rng.normal(15, 8, n_samples),
-        't2mdew': rng.normal(10, 8, n_samples),
-        'ws10m': np.abs(rng.normal(4, 1.5, n_samples)),
-        'score': rng.integers(0, 4, n_samples),
-    })
-    
+    df = pd.read_csv(csv_path)
+
+    # Randomly sample rows
+    df = df.sample(n=min(n_samples, len(df)), random_state=42)
+
+    # Ensure datetime
     df['date'] = pd.to_datetime(df['date'])
+
+    # Add time columns
     df['year'] = df['date'].dt.year
     df['month'] = df['date'].dt.month
     df['day'] = df['date'].dt.day
-    
-    # Add coordinates using fips_coordinates module
+
+    # Add coordinates if possible
     try:
         from fips_coordinates import add_coordinates_to_dataframe
         df = add_coordinates_to_dataframe(df)
     except ImportError:
-        # Fallback: approximate coords
-        df['lat'] = rng.uniform(25, 49, n_samples)
-        df['lon'] = rng.uniform(-125, -67, n_samples)
-    
-    # Generate soil data
-    unique_fips = list(set(df['fips'].unique()))
-    soil_df = pd.DataFrame({
-        'fips': unique_fips,
-        'clay': rng.uniform(10, 60, len(unique_fips)),
-        'sand': rng.uniform(10, 70, len(unique_fips)),
-    })
-    
+        pass
+
+    # Soil data (optional)
+    soil_df = None
+
     return {
         'df': df,
         'soil_df': soil_df,
         'class_dist': get_class_distribution(df['score']),
         'is_demo': True
     }
+
+def add_state_column(df):
+    """
+    Add a 'state' column to dataframe based on FIPS codes.
+    
+    Args:
+        df: DataFrame with 'fips' column
+        
+    Returns:
+        DataFrame with added 'state' column
+    """
+    df = df.copy()
+    if 'fips' in df.columns:
+        df['state'] = df['fips'].apply(fips_to_name)
+    return df

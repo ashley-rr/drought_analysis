@@ -5,17 +5,16 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 
+# http://localhost:8501/
+
 from drought_utils import (
     load_complete_dataset,
-    generate_demo_data,
     get_class_distribution,
     get_correlation_matrix,
     SCALED_DROUGHT_LABELS,
     DROUGHT_COLORS
 )
 
-# Preferred: keep this helper in drought_utils.py.
-# The fallback keeps the dashboard runnable until drought_utils.py is updated.
 try:
     from drought_utils import add_relative_scaled_score
 except ImportError:
@@ -77,7 +76,7 @@ try:
 except ImportError:
     HAS_FIPS_COORDS = False
 
-# â”€â”€ Page config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# --------------------- Page config ---------------------
 st.set_page_config(
     page_title="U.S. Drought Monitor",
     page_icon="ðŸŒµ",
@@ -85,7 +84,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# â”€â”€ Custom CSS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# --------------------- Custom CSS ---------------------
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
@@ -157,27 +156,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# â”€â”€ Data loading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# --------------------- Data loading ---------------------
 @st.cache_data
 def load_data():
-    """Load TEST data only."""
-    try:
-        data = load_complete_dataset(
-            data_path="test.csv",
-            soil_path="soil_data.csv",
-            apply_outlier_treatment_flag=True,
-            sample_size=None
-        )
-        return data
+    data = load_complete_dataset(
+        data_path="train.csv",
+        soil_path="soil_data.csv",
+    )
 
-    except Exception as e:
-        # Fall back to demo data
-        demo = generate_demo_data(n_samples=5000)
-        return demo
-
+    return data
 
 # Load test data
 data = load_data()
+
 test_df = data["df"]
 soil_df = data.get("soil_df")
 is_demo = data.get("is_demo", False)
@@ -195,24 +186,31 @@ PLOTLY_LAYOUT = dict(
     yaxis=dict(gridcolor='#2a2216', linecolor='#3a3020'),
 )
 
+st.markdown("""
+    <style>
+    .st-emotion-cache-1ix68xf h1, 
+    .st-emotion-cache-1ix68xf h2, 
+    .st-emotion-cache-1ix68xf h3, 
+    .st-emotion-cache-1ix68xf h4, 
+    .st-emotion-cache-1ix68xf h5, 
+    .st-emotion-cache-1ix68xf h6 {
+        color: #acaeb0;
+        font-family: "Source Sans", sans-serif;
+        text-align: center;
+        font-size: 20px;
+        !opacity: 1
+    }
+ 
+    tspan {
+        fill: #acaeb0;
+        font-size: 18px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --------------------- Sidebar ---------------------
 with st.sidebar:
-    st.markdown("### Controls")
-#     import streamlit as st
-
-# # Custom CSS to change the appearance of headers and the main container
-# st.markdown("""
-#     <style>
-#     .main {
-#         background-color: #f0f2f6;
-#     }
-#     h1 {
-#         color: #ff4b4b;
-#         text-align: center;
-#     }
-#     </style>
-#     """, unsafe_allow_html=True)
+    st.markdown("## Controls")
 
 # st.title("Styled Streamlit App")
 
@@ -238,8 +236,37 @@ with st.sidebar:
  
     st.markdown("---")
     if 'fips' in df_active.columns:
-        top_fips = df_active['fips'].value_counts().head(30).index.tolist()
-        region_compare = st.multiselect("Compare Regions (FIPS)", options=top_fips, default=top_fips[:3] if len(top_fips) >= 3 else top_fips)
+
+        # Create state FIPS from county FIPS
+        df_active['state_fips'] = (
+            df_active['fips']
+            .astype(str)
+            .str.zfill(5)
+            .str[:2]
+        )
+
+        # Convert to readable state names
+        df_active['state_name'] = (
+            df_active['state_fips']
+            .map(fips_to_name)
+        )
+
+        # Sorted list of available states
+        available_states = sorted(
+            df_active['state_name']
+            .dropna()
+            .unique()
+            .tolist()
+        )
+
+        # User selects up to 3 states
+        region_compare = st.multiselect(
+            "Compare States",
+            options=available_states,
+            default=available_states[:3],
+            max_selections=3
+        )
+
     else:
         region_compare = []
 
@@ -309,7 +336,7 @@ for col, (lbl, val) in zip([c1, c2, c3, c4], metrics):
 st.markdown("<br>", unsafe_allow_html=True)
 
 # --------------------- Tab layout ---------------------
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["🗺️ Map", "⌛ Time Series", "💡 Feature Analysis", "📈 Distributions", "📄 State Scores"])
+tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Map", "⌛ Time Series", "💡 Feature Analysis", "📈 State Scores"])
 
 # --------------------- Map Tab ---------------------
 with tab1:
@@ -344,8 +371,8 @@ with tab1:
                 color_continuous_scale=list(DROUGHT_COLORS.values()),
                 range_color=[0, 3],
                 mapbox_style="carto-darkmatter",
-                zoom=1.5,
-                center={"lat": 54.34, "lon": -115.399},
+                zoom=2.6,
+                center={"lat": 39.8282, "lon": -95.7129},
                 hover_name='state_name',
                 hover_data={
                     'avg_score': ':.3f',
@@ -422,16 +449,42 @@ with tab1:
     # Region comparison graph
     if region_compare and 'fips' in df.columns:
         st.markdown('<p class="section-header">Region Comparison</p>', unsafe_allow_html=True)
-        reg_df = df[df['fips'].isin(region_compare)]
+        reg_df = df[df['state_name'].isin(region_compare)]
+        
         if not reg_df.empty and 'date' in reg_df.columns:
-            fig_reg = px.line(
-                reg_df.sort_values('date'), x='date', y='score', color='fips',
-                title="Drought Score Over Time â€” Selected Regions",
-                labels={'score': 'Drought Score', 'date': 'Date', 'fips': 'County FIPS'}
+            # Average drought score per state per year
+            state_compare = (
+                reg_df
+                .groupby(['year', 'state_name'])['score']
+                .mean()
+                .reset_index()
             )
-            fig_reg.update_layout(**PLOTLY_LAYOUT, height=300)
-            st.plotly_chart(fig_reg, use_container_width=True)
 
+            fig_reg = px.line(
+                state_compare.sort_values('year'),
+                x='year',
+                y='score',
+                color='state_name',
+                markers=True,
+                title="Average Drought Score by State Over Time",
+                labels={
+                    'score': 'Average Drought Score',
+                    'year': 'Year',
+                    'state_name': 'State'
+                }
+            )
+
+            fig_reg.update_layout(
+                **PLOTLY_LAYOUT,
+                height=400
+            )
+
+            fig_reg.update_yaxes(
+                tickvals=[0,1,2,3],
+                ticktext=["None", "Abnormal", "Moderate", "Severe"]
+            )
+                    
+            st.plotly_chart(fig_reg, use_container_width=True)
 
 # --------------------- Time Series Tab ---------------------
 with tab2:
@@ -482,7 +535,7 @@ with tab2:
         fig_ts.add_trace(go.Bar(x=ts['year'], y=ts['prectot'],
             marker_color='#4a9e6b', name='Precip'), row=3, col=1)
  
-        fig_ts.update_layout(**PLOTLY_LAYOUT, height=1500, showlegend=False, margin=dict(l=220, r=120), yaxis_range=[0,3.3])
+        fig_ts.update_layout(**PLOTLY_LAYOUT, height=1500, showlegend=False, margin=dict(l=220, r=120))
         
         for i in range(1, 4):
             fig_ts.update_xaxes(gridcolor='#2a2216', linecolor='#3a3020', row=i, col=1)
@@ -498,11 +551,11 @@ with tab2:
                 x=[pd.Timestamp(2000, m, 1).strftime('%b') for m in pivot.columns],
                 y=pivot.index.astype(str),
                 colorscale=list(DROUGHT_COLORS.values()),
-                zmin=1, zmax=2.5,
+                zmin=-0.25, zmax=2.5,
                 hoverongaps=False,
                 colorbar=dict(title='Score')
             ))
-            fig_heat.update_layout(**PLOTLY_LAYOUT, height=600, margin=dict(l=100, r=100), title="Mean Drought Score by Year & Month")
+            fig_heat.update_layout(**PLOTLY_LAYOUT, height=600, margin=dict(l=150, r=150), title="Mean Drought Score by Year & Month")
             fig_ts.update_annotations(font_size=60)
             st.plotly_chart(fig_heat, use_container_width=True)
 
@@ -513,99 +566,45 @@ with tab3:
  
     col_a, col_b = st.columns(2)
  
-    with col_a:
-        # Scatter: T2M vs PRECTOT
-        if 't2m' in df.columns and 'prectot' in df.columns:
-            sample = df.sample(min(2000, len(df)), random_state=42)
-            fig_sc = px.scatter(
-                sample, x='t2m', y='prectot', color='score',
-                color_continuous_scale=list(DROUGHT_COLORS.values()),
-                range_color=[0,5], opacity=0.6,
-                title="Temperature vs Precipitation",
-                labels={'t2m':'Temperature (Â°C)', 'prectot':'Precipitation (mm)'}
-            )
-            fig_sc.update_layout(**PLOTLY_LAYOUT, height=370)
-            st.plotly_chart(fig_sc, use_container_width=True)
- 
-    with col_b:
-        # Correlation heatmap
-        corr = get_correlation_matrix(df)
-        if not corr.empty:
-            # Limit to top features
-            top_features = corr['score'].abs().sort_values(ascending=False).head(10).index.tolist()
-            corr_subset = corr.loc[top_features, top_features]
-            
-            fig_corr = go.Figure(go.Heatmap(
-                z=corr_subset.values,
-                x=corr_subset.columns, y=corr_subset.columns,
-                colorscale='RdYlGn', zmid=0,
-                text=corr_subset.round(2).values,
-                texttemplate='%{text}',
-                textfont=dict(size=9),
-                hoverongaps=False,
-            ))
-            fig_corr.update_layout(**PLOTLY_LAYOUT, height=370, title="Feature Correlation Matrix")
-            st.plotly_chart(fig_corr, use_container_width=True)
- 
-    # Box plots by drought level
-    st.markdown('<p class="section-header">Variable Distribution by Drought Level</p>', unsafe_allow_html=True)
-    weather_vars = [c for c in ['t2m', 'prectot', 'ws10m', 'qv2m'] if c in df.columns]
-    if weather_vars:
-        sel_var = st.selectbox("Variable", weather_vars)
-        fig_box = px.box(
-            df, x='score', y=sel_var,
-            color='score',
-            color_discrete_map=DROUGHT_COLORS,
-            labels={'score': 'Drought Score'},
-            title=f"{sel_var.upper()} distribution across drought levels",
-            category_orders={'score': sorted(df['score'].unique())}
+    # Scatter: T2M vs PRECTOT
+    if 't2m' in df.columns and 'prectot' in df.columns:
+        # Convert to Celsius
+        df["t2m"] = df["t2m"] / 1.8 - 32                           
+        sample = df.sample(min(300, len(df)), random_state=42)
+        fig_sc = px.scatter(
+            sample, x='t2m', y='prectot', color='score',
+            color_continuous_scale=list(DROUGHT_COLORS.values()),
+            range_color=[0,3],
+            title="Temperature vs Precipitation (Random Sample of 300 Points)",
+            labels={'t2m':'Temperature (C°)', 'prectot':'Precipitation (mm)'}
         )
-        fig_box.update_layout(**PLOTLY_LAYOUT, height=360, showlegend=False)
-        st.plotly_chart(fig_box, use_container_width=True)
+        fig_sc.update_layout(**PLOTLY_LAYOUT, height=500, margin=dict(l=200, r=200))
+        st.plotly_chart(fig_sc, use_container_width=True)
 
+    # Correlation heatmap
+    corr = get_correlation_matrix(df)
+    if not corr.empty:
 
-# --------------------- Distributions Tab ---------------------
-with tab4:
-    st.markdown('<p class="section-header">Score Distributions</p>', unsafe_allow_html=True)
- 
-    d_col1, d_col2 = st.columns(2)
- 
-    with d_col1:
-        counts = df['score'].value_counts().sort_index()
-        fig_bar = go.Figure(go.Bar(
-            x=[SCALED_DROUGHT_LABELS.get(i, str(i)) for i in counts.index],
-            y=counts.values,
-            marker_color=[DROUGHT_COLORS.get(i, '#888') for i in counts.index],
-            text=counts.values, textposition='outside',
+        top_features = corr['score'].abs().sort_values(ascending=False).head(10).index.tolist()
+        corr_subset = corr.loc[top_features, top_features]
+
+        fig_corr = go.Figure(go.Heatmap(
+            z=corr_subset.values, zmin=-0.5, zmax=1,
+            x=corr_subset.columns, y=corr_subset.columns,
+            colorscale='RdYlGn',
+            text=corr_subset.round(2).values,
+            texttemplate='%{text}',
+            textfont=dict(size=9),
+            hoverongaps=False,
         ))
-        fig_bar.update_layout(**PLOTLY_LAYOUT, height=380, title="Record Count per Drought Level",
-                              xaxis_tickangle=-30)
-        st.plotly_chart(fig_bar, use_container_width=True)
- 
-    with d_col2:
-        fig_pie = go.Figure(go.Pie(
-            labels=[SCALED_DROUGHT_LABELS.get(i, str(i)) for i in counts.index],
-            values=counts.values,
-            marker_colors=[DROUGHT_COLORS.get(i, '#888') for i in counts.index],
-            hole=0.45,
-            textinfo='percent+label',
-            textfont=dict(size=11),
-        ))
-        fig_pie.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(family='Syne', color='#e8dcc8'),
-            height=380, title="Drought Level Share",
-            showlegend=False, margin=dict(l=20, r=20, t=50, b=20)
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
- 
+        fig_corr.update_layout(**PLOTLY_LAYOUT, height=500, margin=dict(l=200, r=200), title="Top 10 Most Correlated Features")
+        st.plotly_chart(fig_corr, use_container_width=True)
 
 # --------------------- State scores tab ---------------------
-with tab5:
-    st.markdown('<p class="section-header">Actual Average Drought Scores by State</p>', unsafe_allow_html=True)
+with tab4:
+    st.markdown('<p class="section-header">Average Scores, Scaled Scores, and Records by State</p>', unsafe_allow_html=True)
     st.caption(
-        "The table keeps the original unscaled average score. "
-        "The scaled score is included only to show how the map color was calculated."
+        "The table also shows the original unscaled average score. "
     )
 
     if not state_scores.empty:
@@ -638,10 +637,10 @@ with tab5:
             color_continuous_scale=list(DROUGHT_COLORS.values()),
             range_color=[0, 3],
             labels={
-                'avg_score': 'Actual Average Score',
-                'state_name': 'State',
+                'state_name': 'States',
+                'avg_score': 'Score'
             },
-            title='Unscaled Average Drought Score by State',
+            title='Unscaled Average Drought Scores per State',
         )
         fig_state_scores.update_layout(**PLOTLY_LAYOUT, height=900, showlegend=False)
         st.plotly_chart(fig_state_scores, use_container_width=True)
