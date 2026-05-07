@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
 from drought_utils import (
     load_complete_dataset,
@@ -145,16 +146,25 @@ st.markdown("""
 
 
 # --------------------- Data loading ---------------------
+DATA_PATH = Path("train.csv")
+
+
+def get_file_signature(path):
+    file_stat = path.stat()
+    return file_stat.st_mtime_ns, file_stat.st_size
+
+
 @st.cache_data
-def load_data():
+def load_data(data_path, file_signature):
+    # Include file metadata in the cache key so edited CSV data is reloaded.
     data = load_complete_dataset(
-        data_path="train.csv",
+        data_path=data_path,
     )
 
     return data
 
-# Load test data
-data = load_data()
+# Load data
+data = load_data(str(DATA_PATH), get_file_signature(DATA_PATH))
 
 test_df = data["df"]
 soil_df = data.get("soil_df")
@@ -206,7 +216,8 @@ with st.sidebar:
 
     st.markdown("---")
 
-    all_scores = sorted(df_active['score'].unique())[:4]
+    drought_level_col = 'score_class' if 'score_class' in df_active.columns else 'score'
+    all_scores = sorted(df_active[drought_level_col].dropna().unique())[:4]
     
     score_filter = st.multiselect(
         "Drought Levels",
@@ -378,7 +389,8 @@ with tab1:
         # Map legend
         st.markdown("---")
         st.markdown("**Record Drought Levels**")
-        class_dist = get_class_distribution(df['score'])
+        class_level_col = 'score_class' if 'score_class' in df.columns else 'score'
+        class_dist = get_class_distribution(df[class_level_col])
 
         # Count unique states
         state_counts = agg['drought_label'].value_counts().sort_index()

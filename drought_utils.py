@@ -57,9 +57,9 @@ def load_and_preprocess_data(filepath):
     df['month'] = df['date'].dt.month
     df['day'] = df['date'].dt.day
     
-    # Round scores to integers
-    df['score'] = df['score'].round().astype(int)
-    df['score'] = df['score'].clip(0, 3)
+    # Preserve the source score from train.csv. Use score_class only for
+    # views that need whole-number drought labels.
+    df['score_class'] = df['score'].round().astype(int).clip(0, 3)
     
     # Standardize column names
     df.columns = df.columns.str.lower().str.replace(" ", "_")
