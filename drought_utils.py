@@ -162,8 +162,7 @@ def get_correlation_matrix(df, exclude_cols=None):
 
 
 # ── Complete Pipeline ──────────────────────────────────────────────────────────
-def load_complete_dataset(data_path, soil_path=None, 
-                         sample_size=None):
+def load_complete_dataset(data_path):
     """
     Complete data loading pipeline (single dataset).
     

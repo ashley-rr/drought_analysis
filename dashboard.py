@@ -14,6 +14,8 @@ from drought_utils import (
     FIPS_TO_NAME
 )
 
+from models import knn_roc_multic, smote_roc_multic
+
 try:
     from drought_utils import add_relative_scaled_score
 except ImportError:
@@ -147,7 +149,6 @@ st.markdown("""
 def load_data():
     data = load_complete_dataset(
         data_path="train.csv",
-        soil_path="soil_data.csv",
     )
 
     return data
@@ -179,7 +180,8 @@ st.markdown("""
     .st-emotion-cache-1ix68xf h3, 
     .st-emotion-cache-1ix68xf h4, 
     .st-emotion-cache-1ix68xf h5, 
-    .st-emotion-cache-1ix68xf h6 {
+    .st-emotion-cache-1ix68xf h6,
+    .st-emotion-cache-yn44r9 h3 {
         color: #acaeb0;
         font-family: "Source Sans", sans-serif;
         text-align: center;
@@ -325,7 +327,9 @@ st.markdown("<br>", unsafe_allow_html=True)
 tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Map", "⌛ Time Series", "💡 Feature Analysis", "📈 State Scores"])
 
 # --------------------- Map Tab ---------------------
+
 with tab1:
+
     st.markdown('<p class="section-header">Geographic Drought Distribution</p>', unsafe_allow_html=True)
 
     map_col, info_col = st.columns([3, 1])
@@ -548,43 +552,50 @@ with tab2:
 
 # --------------------- Feature Analysis Tab ---------------------
 with tab3:
-    st.markdown('<p class="section-header">Feature Relationships</p>', unsafe_allow_html=True)
+    
+    # ROC Curves
+    st.markdown('<p class="section-header">ROC Curves</p>', unsafe_allow_html=True)
  
-    col_a, col_b = st.columns(2)
+    left, col1, col2, right = st.columns([0.2, 1, 1, 0.2])        
+    with col1:
+        st.subheader("Multiclass ROC for Decision Tree")
+        st.image("tree_roc.png", use_container_width=True)
+
+        st.subheader("Multiclass ROC for Decision Tree w/ SMOTE Upsampling")
+        st.image("smote_roc.png", use_container_width=True)
+    with col2:
+        st.subheader("Multiclass ROC for KNN")
+        st.image("knn_roc_base.png", use_container_width=True)
+
+        st.subheader("Multiclass ROC for KNN w/o Resampling")
+        st.image("knn_roc.png", use_container_width=True)
  
-    # Scatter: T2M vs PRECTOT
-    if 't2m' in df.columns and 'prectot' in df.columns:
-        # Convert to Celsius
-        df["t2m"] = df["t2m"] / 1.8 - 32                           
-        sample = df.sample(min(300, len(df)), random_state=42)
-        fig_sc = px.scatter(
-            sample, x='t2m', y='prectot', color='score',
-            color_continuous_scale=list(DROUGHT_COLORS.values()),
-            range_color=[0,3],
-            title="Temperature vs Precipitation (Random Sample of 300 Points)",
-            labels={'t2m':'Temperature (C°)', 'prectot':'Precipitation (mm)'}
-        )
-        fig_sc.update_layout(**PLOTLY_LAYOUT, height=500, margin=dict(l=200, r=200))
-        st.plotly_chart(fig_sc, use_container_width=True)
+    # Feature importance
+    st.markdown('<p class="section-header">Features</p>', unsafe_allow_html=True)
 
-    # Correlation heatmap
-    corr = get_correlation_matrix(df)
-    if not corr.empty:
+    col1, col2, col= st.columns([1, 4, 1])        
+    with col2:
+        st.subheader("Feature Importance Scores")
+        st.image("feature_importance.png", use_container_width=True)
 
-        top_features = corr['score'].abs().sort_values(ascending=False).head(10).index.tolist()
-        corr_subset = corr.loc[top_features, top_features]
+    # Matrices
+    st.markdown('<p class="section-header">Matrices</p>', unsafe_allow_html=True)
 
-        fig_corr = go.Figure(go.Heatmap(
-            z=corr_subset.values, zmin=-0.5, zmax=1,
-            x=corr_subset.columns, y=corr_subset.columns,
-            colorscale='RdYlGn',
-            text=corr_subset.round(2).values,
-            texttemplate='%{text}',
-            textfont=dict(size=9),
-            hoverongaps=False,
-        ))
-        fig_corr.update_layout(**PLOTLY_LAYOUT, height=500, margin=dict(l=200, r=200), title="Top 10 Most Correlated Features")
-        st.plotly_chart(fig_corr, use_container_width=True)
+    col1, col2, = st.columns([1, 1])        
+    with col1:
+        st.subheader("Confusion Matrix")
+        st.image("confusion_matrix.png", use_container_width=True)
+    with col2:
+        st.subheader("Correlation Matrix")
+        st.image("correl_matrix.png", use_container_width=True)
+
+    # Silhouettes
+    st.markdown('<p class="section-header">Silhouettes</p>', unsafe_allow_html=True)
+
+    col1, col2, col= st.columns([1, 10, 1])           
+    with col2:
+        st.subheader("Silhouettes Coefficient")
+        st.image("silhouettes_coeff.png", use_container_width=True)
 
 # --------------------- State scores tab ---------------------
 with tab4:
