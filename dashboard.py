@@ -221,43 +221,6 @@ with st.sidebar:
         year_range = st.select_slider("Year Range", options=years, value=(years[0], years[-1]))
     else:
         year_range = None
- 
-    st.markdown("---")
-    if 'fips' in df_active.columns:
-
-        # Create state FIPS from county FIPS
-        df_active['state_fips'] = (
-            df_active['fips']
-            .astype(str)
-            .str.zfill(5)
-            .str[:2]
-        )
-
-        # Convert to readable state names
-        df_active['state_name'] = (
-            df_active['state_fips']
-            .map(FIPS_TO_NAME)
-        )
-
-        # Sorted list of available states
-        available_states = sorted(
-            df_active['state_name']
-            .dropna()
-            .unique()
-            .tolist()
-        )
-
-        # User selects up to 3 states
-        region_compare = st.multiselect(
-            "Compare States",
-            options=available_states,
-            default=available_states[:3],
-            max_selections=3
-        )
-
-    else:
-        region_compare = []
-
 
 # --------------------- Sidebar Filter ---------------------
 
@@ -435,46 +398,6 @@ with tab1:
                     <span style="color:#8a7a60;font-size:.75rem;">{count:,} ({pct:.1f}%)</span>
                   </div>
                 </div>""", unsafe_allow_html=True)
- 
-    # Region comparison graph
-    if region_compare and 'fips' in df.columns:
-        st.markdown('<p class="section-header">Region Comparison</p>', unsafe_allow_html=True)
-        reg_df = df[df['state_name'].isin(region_compare)]
-        
-        if not reg_df.empty and 'date' in reg_df.columns:
-            # Average drought score per state per year
-            state_compare = (
-                reg_df
-                .groupby(['year', 'state_name'])['score']
-                .mean()
-                .reset_index()
-            )
-
-            fig_reg = px.line(
-                state_compare.sort_values('year'),
-                x='year',
-                y='score',
-                color='state_name',
-                markers=True,
-                title="Average Drought Score by State Over Time",
-                labels={
-                    'score': 'Average Drought Score',
-                    'year': 'Year',
-                    'state_name': 'State'
-                }
-            )
-
-            fig_reg.update_layout(
-                **PLOTLY_LAYOUT,
-                height=400
-            )
-
-            fig_reg.update_yaxes(
-                tickvals=[0,1,2,3],
-                ticktext=["None", "Abnormal", "Moderate", "Severe"]
-            )
-                    
-            st.plotly_chart(fig_reg, use_container_width=True)
 
 # --------------------- Time Series Tab ---------------------
 with tab2:
@@ -531,24 +454,6 @@ with tab2:
             fig_ts.update_xaxes(gridcolor='#2a2216', linecolor='#3a3020', row=i, col=1)
             fig_ts.update_yaxes(gridcolor='#2a2216', linecolor='#3a3020', row=i, col=1)
         st.plotly_chart(fig_ts, use_container_width=True)
- 
-        # Monthly heatmap
-        st.markdown('<p class="section-header">Monthly Drought Heatmap</p>', unsafe_allow_html=True)
-        if 'month' in df.columns and 'year' in df.columns:
-            pivot = df.groupby(['year', 'month'])['score'].mean().unstack()
-            fig_heat = go.Figure(go.Heatmap(
-                z=pivot.values,
-                x=[pd.Timestamp(2000, m, 1).strftime('%b') for m in pivot.columns],
-                y=pivot.index.astype(str),
-                colorscale=list(DROUGHT_COLORS.values()),
-                zmin=-0.25, zmax=2.5,
-                hoverongaps=False,
-                colorbar=dict(title='Score')
-            ))
-            fig_heat.update_layout(**PLOTLY_LAYOUT, height=600, margin=dict(l=150, r=150), title="Mean Drought Score by Year & Month")
-            fig_ts.update_annotations(font_size=60)
-            st.plotly_chart(fig_heat, use_container_width=True)
-
 
 # --------------------- Feature Analysis Tab ---------------------
 with tab3:
@@ -581,21 +486,10 @@ with tab3:
     # Matrices
     st.markdown('<p class="section-header">Matrices</p>', unsafe_allow_html=True)
 
-    col1, col2, = st.columns([1, 1])        
-    with col1:
-        st.subheader("Confusion Matrix")
-        st.image("confusion_matrix.png", use_container_width=True)
+    col1, col2, col3 = st.columns([1, 10, 1])        
     with col2:
         st.subheader("Correlation Matrix")
         st.image("correl_matrix.png", use_container_width=True)
-
-    # Silhouettes
-    st.markdown('<p class="section-header">Silhouettes</p>', unsafe_allow_html=True)
-
-    col1, col2, col= st.columns([1, 10, 1])           
-    with col2:
-        st.subheader("Silhouettes Coefficient")
-        st.image("silhouettes_coeff.png", use_container_width=True)
 
 # --------------------- State scores tab ---------------------
 with tab4:
